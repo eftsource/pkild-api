@@ -5,6 +5,7 @@ require 'sinatra'
 set :bind, '0.0.0.0'
  
 get '/api/all' do
+  content_type :json
   crtfiles = File.join("/home/heathseals/pkild-crts/**", "*.crt")
   all =  Dir.glob(crtfiles)
   array = []
