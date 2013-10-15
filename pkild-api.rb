@@ -3,33 +3,50 @@ require 'json'
 require 'sinatra'
 
 set :bind, '0.0.0.0'
+
+eftroot = "/home/heathseals/pkild-api"
+eftdomain = "/home/heathseals/pkild-api/eftdomain/crts"
+eftsource = "/home/heathseals/pkild-api/eftsource/crts"
  
-get '/api/all' do
+get '/api/all/:type' do
   content_type :json
-  crtfiles = File.join("/home/heathseals/pkild-api/**", "*.crt")
-  all =  Dir.glob(crtfiles)
-  array = []
-  all.each do |x|
+  crtfiles = File.join("#{eftroot}/**", "*.crt")
+  crtpath =  Dir.glob(crtfiles)
+  all = []
+  valid = []
+  expired = []
+  crtpath.each do |x|
     x.each_line do |line|
       raw = File.read line
       cert = OpenSSL::X509::Certificate.new raw
-      array << {:subject => "#{cert.subject}", :issuer => "#{cert.issuer}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}"}
+      if cert.not_after < Time.now
+        expired << {:valid => "no", :subject => "#{cert.subject}", :issuer => "#{cert.issuer}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}"}
+      else
+        valid << {:valid => "yes", :subject => "#{cert.subject}", :issuer => "#{cert.issuer}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}"}
+      end
     end
   end
-  array.group_by {|d| d[:subject]}
-  JSON.pretty_generate(array)
+  all = expired + valid
+  case "#{params[:type]}"
+  when 'valid'
+   JSON.pretty_generate(valid)
+  when 'expired'
+   JSON.pretty_generate(expired)
+  when 'both'
+   JSON.pretty_generate(all)
+  else
+    "#{params[:type]} not implemented"
+  end
 end
 
 get '/api/:type/:name' do
   content_type :json
   if "#{params[:type]}" == 'host' 
-    certdir = "/home/heathseals/pkild-api/eftdomain/crts"
     domain = "eftdomain.net"
-    raw = File.read "#{certdir}/#{params[:name]}.#{domain}/#{params[:name]}.#{domain}.crt"
+    raw = File.read "#{eftdomain}/#{params[:name]}.#{domain}/#{params[:name]}.#{domain}.crt"
   end
   if "#{params[:type]}" == 'person' 
-    certdir = "/home/heathseals/pkild-api/eftsource/crts"
-    raw = File.read "#{certdir}/#{params[:name]}/#{params[:name]}.crt"
+    raw = File.read "#{eftsource}/#{params[:name]}/#{params[:name]}.crt"
   end
   cert = OpenSSL::X509::Certificate.new raw
   hash = {:id => "#{params[:name]}", :type => "#{params[:type]}", :subject => "#{cert.subject}", :issuer => "#{cert.issuer}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}"}
@@ -39,13 +56,11 @@ end
 get '/api/:type/:name/:command' do
   content_type :json
   if "#{params[:type]}" == 'host' 
-    certdir = "/home/heathseals/pkild-api/eftdomain/crts"
     domain = "eftdomain.net"
-    raw = File.read "#{certdir}/#{params[:name]}.#{domain}/#{params[:name]}.#{domain}.crt"
+    raw = File.read "#{eftdomain}/#{params[:name]}.#{domain}/#{params[:name]}.#{domain}.crt"
   end
   if "#{params[:type]}" == 'person' 
-    certdir = "/home/heathseals//pkild-api/eftsource/crts"
-    raw = File.read "#{certdir}/#{params[:name]}/#{params[:name]}.crt"
+    raw = File.read "#{eftsource}/#{params[:name]}/#{params[:name]}.crt"
   end
   cert = OpenSSL::X509::Certificate.new raw
   case "#{params[:command]}"
