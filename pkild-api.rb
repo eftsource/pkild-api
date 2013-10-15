@@ -19,21 +19,34 @@ get '/api/all/:type' do
     x.each_line do |line|
       raw = File.read line
       cert = OpenSSL::X509::Certificate.new raw
+      subjectcn = cert.subject.to_s.match(/CN=(.*)\//)[1]
+      issuercn = cert.issuer.to_s.match(/CN=(.*)\//)[1]
       if cert.not_after < Time.now
-        expired << {:valid => "no", :subject => "#{cert.subject}", :issuer => "#{cert.issuer}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}"}
+        expired << {:valid => "false", :subjectcn => "#{subjectcn}", :issuercn => "#{issuercn}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}"}
       else
-        valid << {:valid => "yes", :subject => "#{cert.subject}", :issuer => "#{cert.issuer}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}"}
+        valid << {:valid => "true", :subjectcn => "#{subjectcn}", :issuercn => "#{issuercn}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}"}
       end
     end
   end
   all = expired + valid
   case "#{params[:type]}"
   when 'valid'
-   JSON.pretty_generate(valid)
+   sorted = valid.sort_by {|h| h[:not_after]}
+   JSON.pretty_generate(sorted)
   when 'expired'
-   JSON.pretty_generate(expired)
+   sorted = expired.sort_by {|h| h[:not_after]}
+   JSON.pretty_generate(sorted)
   when 'both'
-   JSON.pretty_generate(all)
+   sorted = all.sort_by {|h| h[:not_after]}
+   JSON.pretty_generate(sorted)
+  when 'next'
+   sorted = valid.sort_by {|h| h[:not_after]}
+   expiresnext = sorted[0]
+   JSON.pretty_generate(expiresnext)
+  when 'nextten'
+   sorted = valid.sort_by {|h| h[:not_after]}
+   nextten = sorted[0..9]
+   JSON.pretty_generate(nextten)
   else
     "#{params[:type]} not implemented"
   end
