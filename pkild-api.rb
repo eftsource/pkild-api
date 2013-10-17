@@ -4,6 +4,14 @@ require 'sinatra'
 
 set :bind, '0.0.0.0'
 
+def certinfo(cert)
+    @subject_cn = cert.subject.to_s.match(/CN=(.*)\//)[1]
+    @issuer_cn = cert.issuer.to_s.match(/CN=(.*)\//)[1]
+    @days_left = DateTime.parse("#{cert.not_after}").mjd - DateTime.now.mjd
+    return @subject_cn,@issuer_cn,@days_left
+end
+
+
 eftroot = "/home/heathseals/pkild-api"
 eftdomain = "/home/heathseals/pkild-api/eftdomain/crts"
 eftsource = "/home/heathseals/pkild-api/eftsource/crts"
@@ -16,13 +24,11 @@ get '/api/all/:type' do
   crtpath.each do |x|
     x.each_line do |line|
       cert = OpenSSL::X509::Certificate.new(File.read line)
-      subject_cn = cert.subject.to_s.match(/CN=(.*)\//)[1]
-      issuer_cn = cert.issuer.to_s.match(/CN=(.*)\//)[1]
-      days_left = DateTime.parse("#{cert.not_after}").mjd - DateTime.now.mjd
+      certinfo(cert)
       if cert.not_after < Time.now
-        expired << {:valid => "false", :subject_cn => "#{subject_cn}", :issuer_cn => "#{issuer_cn}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}", :days_left => ("#{days_left}")}
+        expired << {:valid => "false", :subject_cn => "#{@subject_cn}", :issuer_cn => "#{@issuer_cn}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}", :days_left => ("#{@days_left}")}
       else
-        valid << {:valid => "true", :subject_cn => "#{subject_cn}", :issuer_cn => "#{issuer_cn}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}", :days_left => ("#{days_left}")}
+        valid << {:valid => "true", :subject_cn => "#{@subject_cn}", :issuer_cn => "#{@issuer_cn}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}", :days_left => ("#{@days_left}")}
       end
     end
   end
@@ -55,15 +61,13 @@ get '/api/:type/:name' do
   if "#{params[:type]}" == 'host' 
     domain = "eftdomain.net"
     cert = OpenSSL::X509::Certificate.new(File.read "#{eftdomain}/#{params[:name]}.#{domain}/#{params[:name]}.#{domain}.crt")
-    subject_cn = cert.subject.to_s.match(/CN=(.*)\//)[1]
-    days_left = DateTime.parse("#{cert.not_after}").mjd - DateTime.now.mjd
+    certinfo(cert)
   end
   if "#{params[:type]}" == 'person' 
     cert = OpenSSL::X509::Certificate.new(File.read "#{eftsource}/#{params[:name]}/#{params[:name]}.crt")
-    subject_cn = cert.subject.to_s.match(/CN=(.*)\//)[1]
-    days_left = DateTime.parse("#{cert.not_after}").mjd - DateTime.now.mjd
+    certinfo(cert)
   end
-  hash = {:subject_cn => "#{subject_cn}", :type => "#{params[:type]}", :subject => "#{cert.subject}", :issuer => "#{cert.issuer}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}", :days_left => "#{days_left}"}
+  hash = {:subject_cn => "#{@subject_cn}", :type => "#{params[:type]}", :subject => "#{cert.subject}", :issuer => "#{cert.issuer}", :not_before => "#{cert.not_before}", :not_after => "#{cert.not_after}", :days_left => "#{@days_left}"}
   JSON.pretty_generate(hash) 
 end
 
@@ -72,24 +76,24 @@ get '/api/:type/:name/:command' do
   if "#{params[:type]}" == 'host' 
     domain = "eftdomain.net"
     cert = OpenSSL::X509::Certificate.new(File.read "#{eftdomain}/#{params[:name]}.#{domain}/#{params[:name]}.#{domain}.crt")
-    subject_cn = cert.subject.to_s.match(/CN=(.*)\//)[1]
+    certinfo(cert)
   end
   if "#{params[:type]}" == 'person' 
     cert = OpenSSL::X509::Certificate.new(File.read "#{eftsource}/#{params[:name]}/#{params[:name]}.crt")
-    subject_cn = cert.subject.to_s.match(/CN=(.*)\//)[1]
+    certinfo(cert)
   end
   case "#{params[:command]}"
   when 'issuer'
-    hash = {:subject_cn => "#{subject_cn}", :type => "#{params[:type]}", :issuer => "#{cert.issuer}"}
+    hash = {:subject_cn => "#{@subject_cn}", :type => "#{params[:type]}", :issuer => "#{cert.issuer}"}
     JSON.pretty_generate(hash) 
   when 'not_after'
-    hash = {:subject_cn => "#{subject_cn}", :type => "#{params[:type]}", :not_after => "#{cert.not_after}"}
+    hash = {:subject_cn => "#{@subject_cn}", :type => "#{params[:type]}", :not_after => "#{cert.not_after}"}
     JSON.pretty_generate(hash) 
   when 'not_before'
-    hash = {:subject_cn => "#{subject_cn}", :type => "#{params[:type]}", :not_before => "#{cert.not_before}"}
+    hash = {:subject_cn => "#{@subject_cn}", :type => "#{params[:type]}", :not_before => "#{cert.not_before}"}
     JSON.pretty_generate(hash) 
   when 'subject'
-    hash = {:subject_cn => "#{subject_cn}", :type => "#{params[:type]}", :subject => "#{cert.subject}"}
+    hash = {:subject_cn => "#{@subject_cn}", :type => "#{params[:type]}", :subject => "#{cert.subject}"}
     JSON.pretty_generate(hash) 
   else
     "#{params[:command]} not implemented"
